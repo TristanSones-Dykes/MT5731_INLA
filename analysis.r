@@ -181,8 +181,7 @@ f <- as.formula(paste0("y ~ ", # Response first
 ))
 
 # Bradley-Terry model in INLA
-inla_model <- inla(f, data = bt_df, 
-                    family = "binomial", offset = )
+inla_model <- inla(f, data = bt_df, family = "binomial")
 summary(inla_model)
 
 inla_coefs <- summary(inla_model)$fixed[, 1]
@@ -201,3 +200,7 @@ summary(lm)
 
 # use coefficients of lm to scale inla coefficients
 coef_df$inla_scaled <- coef_df$inla * lm$coefficients[2] + lm$coefficients[1]
+
+f_random <- as.formula(paste0("y ~ ", 
+                        paste(colnames(bt_df)[2:length(colnames(bt_df))], collapse = " + "), 
+                        " + f(", paste(colnames(bt_df)[-1], collapse = " + "), ", model = 'iid')"))
