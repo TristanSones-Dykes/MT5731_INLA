@@ -99,6 +99,7 @@ dim(X)
 
 y <- as.numeric(basketball_games$HOME_TEAM_WINS)
 bt_df <- as.data.frame(cbind(y, X))
+colnames(bt_df) <- c("y", "Seventy_Sixers", "Bucks", "Bulls", "Cavaliers", "Celtics", "Clippers", "Grizzlies", "Hawks", "Heat", "Hornets", "Jazz", "Kings", "Knicks", "Lakers", "Magic", "Mavericks", "Nets", "Nuggets", "Pacers", "Pelicans", "Pistons", "Raptors", "Rockets", "Spurs", "Suns", "Thunder", "Timberwolves", "Trail_Blazers", "Warriors", "Wizards")
 
 # Bradley-Terry model with home advantage
 bt_mod <- glm(y ~ ., data = bt_df, family = binomial())
@@ -106,7 +107,7 @@ summary(bt_mod)
 
 # Compare BT coefficients with overall win percentage
 coef_df <- data.frame(
-  team = teams,
+  team = bt_df %>% select(-y) %>% colnames() %>% as.character(),
   beta = c(summary(bt_mod)$coefficients[2:length(teams), "Estimate"], 0)
 )
 
@@ -170,3 +171,33 @@ roc_plot +
        title = "Test set ROC plots") +
   geom_abline(slope = 1, intercept = 0, linetype = "dashed") +
   theme(legend.position = "bottom")
+
+
+library(INLA)
+
+# Specify the formula
+f <- as.formula(paste0("y ~ ", # Response first
+                          paste(colnames(bt_df)[2:length(colnames(bt_df))], collapse = " + ") # Collapse the vector of covariates
+))
+
+# Bradley-Terry model in INLA
+inla_model <- inla(f, data = bt_df, 
+                    family = "binomial", offset = )
+summary(inla_model)
+
+inla_coefs <- summary(inla_model)$fixed[, 1]
+
+# Compare INLA and glm coefficients
+coef_df$inla = inla_coefs[2:length(inla_coefs)]
+
+ggplot(coef_df, aes(x = beta, y = inla)) +
+  geom_point() +
+  geom_text_repel(aes(label = team)) +
+  labs(x = "glm beta", y = "INLA beta",
+       title = "glm beta vs. INLA beta")
+
+lm <- lm(beta ~ inla, data = coef_df)
+summary(lm)
+
+# use coefficients of lm to scale inla coefficients
+coef_df$inla_scaled <- coef_df$inla * lm$coefficients[2] + lm$coefficients[1]
